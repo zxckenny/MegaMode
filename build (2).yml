@@ -1,0 +1,663 @@
+name: Build Geode Mod
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+          - name: Android32
+            os: ubuntu-latest
+            target: Android32
+          - name: Android64
+            os: ubuntu-latest
+            target: Android64
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create mod files
+        shell: bash
+        run: |
+          mkdir -p src
+          cat > mod.json << 'GDEOF'
+          {
+              "geode": "4.6.0",
+              "gd": {
+                  "win": "*",
+                  "android": "*",
+                  "mac": "*",
+                  "ios": "*"
+              },
+              "id": "gdfan.megamod",
+              "name": "Mega Mod",
+              "version": "v1.0.0",
+              "developer": "gdfan",
+              "description": "Всё в одном: noclip, noclip accuracy, voice jump, speedhack, unlock all, монеты и валюта.",
+              "settings": {
+                  "noclip": {
+                      "type": "bool",
+                      "name": "Noclip",
+                      "description": "Не умирать от препятствий.",
+                      "default": false
+                  },
+                  "noclip-p1": {
+                      "type": "bool",
+                      "name": "Noclip: Player 1",
+                      "description": "Noclip для первого игрока.",
+                      "default": true
+                  },
+                  "noclip-p2": {
+                      "type": "bool",
+                      "name": "Noclip: Player 2",
+                      "description": "Noclip для второго игрока (дуал-режим).",
+                      "default": true
+                  },
+                  "show-accuracy": {
+                      "type": "bool",
+                      "name": "Noclip Accuracy",
+                      "description": "Показывает точность (процент кадров без касаний препятствий) и количество смертей в углу экрана.",
+                      "default": true
+                  },
+                  "noclip-min-accuracy": {
+                      "type": "float",
+                      "name": "Min Accuracy (авто-смерть)",
+                      "description": "Если точность ниже этого процента — персонаж умирает. 0 = выключено.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 100,
+                      "control": {
+                          "input": true,
+                          "slider": true
+                      }
+                  },
+                  "voice-jump": {
+                      "type": "bool",
+                      "name": "Voice Jump",
+                      "description": "Любой звук в микрофон = нажатие. Нужен доступ к микрофону.",
+                      "default": false
+                  },
+                  "voice-threshold": {
+                      "type": "float",
+                      "name": "Voice Sensitivity (порог громкости)",
+                      "description": "Чем меньше значение, тем чувствительнее микрофон.",
+                      "default": 0.15,
+                      "min": 0.01,
+                      "max": 1,
+                      "control": {
+                          "input": true,
+                          "slider": true
+                      }
+                  },
+                  "speed": {
+                      "type": "float",
+                      "name": "Speedhack",
+                      "description": "Скорость игры. 1 = обычная.",
+                      "default": 1,
+                      "min": 0.1,
+                      "max": 5,
+                      "control": {
+                          "input": true,
+                          "slider": true
+                      }
+                  },
+                  "jump-hack": {
+                      "type": "bool",
+                      "name": "Jump Hack",
+                      "description": "Бесконечные прыжки в воздухе (прогресс не сохраняется).",
+                      "default": false
+                  },
+                  "no-death-effect": {
+                      "type": "bool",
+                      "name": "No Death Effect",
+                      "description": "Убирает анимацию взрыва при смерти.",
+                      "default": false
+                  },
+                  "show-hitboxes": {
+                      "type": "bool",
+                      "name": "Show Hitboxes",
+                      "description": "Показывает хитбоксы в уровне.",
+                      "default": false
+                  },
+                  "show-fps": {
+                      "type": "bool",
+                      "name": "Show FPS",
+                      "description": "Счётчик FPS в углу экрана.",
+                      "default": false
+                  },
+                  "fps-cap": {
+                      "type": "int",
+                      "name": "FPS Cap",
+                      "description": "Лимит кадров в секунду. 0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 1000,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "unlock-all": {
+                      "type": "bool",
+                      "name": "Unlock All",
+                      "description": "Открывает все иконки, цвета, трейлы, эффекты и т.д.",
+                      "default": true
+                  },
+                  "apply-on-launch": {
+                      "type": "bool",
+                      "name": "Apply currencies on launch",
+                      "description": "Применять значения ниже при запуске игры (или по кнопке Mega в главном меню).",
+                      "default": false
+                  },
+                  "stars": {
+                      "type": "int",
+                      "name": "Stars",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "moons": {
+                      "type": "int",
+                      "name": "Moons",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "orbs": {
+                      "type": "int",
+                      "name": "Mana Orbs",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "diamonds": {
+                      "type": "int",
+                      "name": "Diamonds",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "user-coins": {
+                      "type": "int",
+                      "name": "User Coins",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "secret-coins": {
+                      "type": "int",
+                      "name": "Secret Coins",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  },
+                  "demons": {
+                      "type": "int",
+                      "name": "Demons",
+                      "description": "0 = не менять.",
+                      "default": 0,
+                      "min": 0,
+                      "max": 999999999,
+                      "control": {
+                          "input": true
+                      }
+                  }
+              }
+          }
+          GDEOF
+          cat > CMakeLists.txt << 'GDEOF'
+          cmake_minimum_required(VERSION 3.21)
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
+              set(CMAKE_OSX_ARCHITECTURES "arm64")
+          else()
+              set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+          endif()
+          set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
+          project(MegaMod VERSION 1.0.0)
+
+          file(GLOB SOURCES src/*.cpp)
+          add_library(${PROJECT_NAME} SHARED ${SOURCES})
+
+          if (NOT DEFINED ENV{GEODE_SDK})
+              message(FATAL_ERROR "Unable to find Geode SDK! Please define GEODE_SDK environment variable")
+          else()
+              message(STATUS "Found Geode: $ENV{GEODE_SDK}")
+          endif()
+
+          add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
+          setup_geode_mod(${PROJECT_NAME})
+          GDEOF
+          cat > src/main.cpp << 'GDEOF'
+          #include <Geode/Geode.hpp>
+          #include <Geode/modify/PlayLayer.hpp>
+          #include <Geode/modify/MenuLayer.hpp>
+          #include <Geode/modify/GameManager.hpp>
+          #include <Geode/modify/GameStatsManager.hpp>
+          #include <Geode/modify/GJGameLevel.hpp>
+          #include <Geode/modify/CCScheduler.hpp>
+          #include <Geode/modify/PlayerObject.hpp>
+          #include <cstring>
+
+          using namespace geode::prelude;
+
+          // ---------------------------------------------------------------- helpers
+          namespace {
+              bool getB(char const* key) { return Mod::get()->getSettingValue<bool>(key); }
+              double getD(char const* key) { return Mod::get()->getSettingValue<double>(key); }
+              int64_t getI(char const* key) { return Mod::get()->getSettingValue<int64_t>(key); }
+
+              // Если включены читы, прогресс/рекорды не сохраняются и не уходят в лидерборды.
+              bool isCheating() {
+                  return getB("noclip") || getB("jump-hack") || getD("speed") != 1.0;
+              }
+
+              void applyFps() {
+                  auto v = getI("fps-cap");
+                  if (v > 0) CCDirector::sharedDirector()->setAnimationInterval(1.0 / static_cast<double>(v));
+              }
+
+              void applyCurrencies() {
+                  auto gsm = GameStatsManager::sharedState();
+                  auto set = [&](char const* statKey, char const* setting) {
+                      auto v = getI(setting);
+                      if (v > 0) gsm->setStat(statKey, static_cast<int>(v));
+                  };
+                  set("6", "stars");
+                  set("28", "moons");
+                  set("14", "orbs");
+                  set("13", "diamonds");
+                  set("12", "user-coins");
+                  set("8", "secret-coins");
+                  set("5", "demons");
+                  GameManager::sharedState()->save();
+              }
+          }
+
+          // ---------------------------------------------------------------- microphone (FMOD recording)
+          namespace mic {
+              constexpr unsigned RATE = 24000;
+              constexpr unsigned SECONDS = 2;
+              constexpr unsigned LEN = RATE * SECONDS; // samples in ring buffer
+
+              FMOD::Sound* sound = nullptr;
+              unsigned lastPos = 0;
+              bool started = false;
+
+              bool start() {
+                  if (started) return true;
+                  auto engine = FMODAudioEngine::sharedEngine();
+                  if (!engine || !engine->m_system) return false;
+                  auto sys = engine->m_system;
+
+                  int drivers = 0, connected = 0;
+                  if (sys->getRecordNumDrivers(&drivers, &connected) != FMOD_OK || drivers <= 0) {
+                      log::warn("Voice Jump: микрофон не найден или нет доступа");
+                      return false;
+                  }
+
+                  FMOD_CREATESOUNDEXINFO info;
+                  std::memset(&info, 0, sizeof(info));
+                  info.cbsize = sizeof(info);
+                  info.numchannels = 1;
+                  info.format = FMOD_SOUND_FORMAT_PCM16;
+                  info.defaultfrequency = RATE;
+                  info.length = LEN * sizeof(short);
+
+                  if (sys->createSound(nullptr, FMOD_LOOP_NORMAL | FMOD_OPENUSER, &info, &sound) != FMOD_OK) {
+                      sound = nullptr;
+                      return false;
+                  }
+                  if (sys->recordStart(0, sound, true) != FMOD_OK) {
+                      sound->release();
+                      sound = nullptr;
+                      return false;
+                  }
+                  lastPos = 0;
+                  started = true;
+                  return true;
+              }
+
+              void stop() {
+                  if (!started) return;
+                  auto engine = FMODAudioEngine::sharedEngine();
+                  if (engine && engine->m_system) engine->m_system->recordStop(0);
+                  if (sound) sound->release();
+                  sound = nullptr;
+                  started = false;
+              }
+
+              // Пиковая громкость 0..1 с прошлого вызова
+              float level() {
+                  if (!started || !sound) return 0.f;
+                  auto engine = FMODAudioEngine::sharedEngine();
+                  unsigned pos = 0;
+                  if (engine->m_system->getRecordPosition(0, &pos) != FMOD_OK) return 0.f;
+                  if (pos == lastPos) return 0.f;
+
+                  unsigned count = pos > lastPos ? pos - lastPos : LEN - lastPos + pos;
+                  void *p1 = nullptr, *p2 = nullptr;
+                  unsigned l1 = 0, l2 = 0;
+                  if (sound->lock(lastPos * 2, count * 2, &p1, &p2, &l1, &l2) != FMOD_OK) return 0.f;
+
+                  int peak = 0;
+                  auto scan = [&](void* p, unsigned len) {
+                      if (!p) return;
+                      auto s = static_cast<short*>(p);
+                      for (unsigned i = 0; i < len / 2; i++) {
+                          int a = std::abs(static_cast<int>(s[i]));
+                          if (a > peak) peak = a;
+                      }
+                  };
+                  scan(p1, l1);
+                  scan(p2, l2);
+                  sound->unlock(p1, p2, l1, l2);
+                  lastPos = pos;
+                  return peak / 32768.f;
+              }
+          }
+
+          // ---------------------------------------------------------------- PlayLayer: noclip, accuracy, voice jump
+          class $modify(MegaPlayLayer, PlayLayer) {
+              struct Fields {
+                  int total = 0;
+                  int bad = 0;
+                  bool diedThisFrame = false;
+                  bool killed = false;
+                  bool micDown = false;
+                  float quiet = 0.f;
+                  CCLabelBMFont* label = nullptr;
+                  CCLabelBMFont* fpsLabel = nullptr;
+                  float fps = 60.f;
+                  bool hbOn = false;
+              };
+
+              void setupHasCompleted() {
+                  PlayLayer::setupHasCompleted();
+                  auto f = m_fields.self();
+
+                  auto win = CCDirector::sharedDirector()->getWinSize();
+                  f->label = CCLabelBMFont::create("", "bigFont.fnt");
+                  f->label->setScale(0.4f);
+                  f->label->setAnchorPoint({0.f, 1.f});
+                  f->label->setPosition({8.f, win.height - 8.f});
+                  f->label->setOpacity(190);
+                  f->label->setZOrder(100);
+                  m_uiLayer->addChild(f->label);
+
+                  f->fpsLabel = CCLabelBMFont::create("", "bigFont.fnt");
+                  f->fpsLabel->setScale(0.4f);
+                  f->fpsLabel->setAnchorPoint({0.f, 1.f});
+                  f->fpsLabel->setPosition({8.f, win.height - 26.f});
+                  f->fpsLabel->setOpacity(190);
+                  f->fpsLabel->setZOrder(100);
+                  m_uiLayer->addChild(f->fpsLabel);
+
+                  applyFps();
+
+                  if (getB("voice-jump")) mic::start();
+              }
+
+              void resetLevel() {
+                  PlayLayer::resetLevel();
+                  auto f = m_fields.self();
+                  f->total = 0;
+                  f->bad = 0;
+                  f->diedThisFrame = false;
+                  f->killed = false;
+                  if (f->micDown) {
+                      f->micDown = false;
+                  }
+              }
+
+              void destroyPlayer(PlayerObject* player, GameObject* object) {
+                  bool applies = getB("noclip") &&
+                      ((player == m_player1 && getB("noclip-p1")) || (player == m_player2 && getB("noclip-p2")));
+                  if (!applies || object == m_anticheatSpike) {
+                      PlayLayer::destroyPlayer(player, object);
+                      return;
+                  }
+                  m_fields->diedThisFrame = true; // noclip: считаем «смерть», но не умираем
+              }
+
+              void postUpdate(float dt) {
+                  PlayLayer::postUpdate(dt);
+                  auto f = m_fields.self();
+
+                  // ---- Hitboxes
+                  if (getB("show-hitboxes")) {
+                      f->hbOn = true;
+                      m_isDebugDrawEnabled = true;
+                      this->updateDebugDraw();
+                  } else if (f->hbOn) {
+                      f->hbOn = false;
+                      m_isDebugDrawEnabled = false;
+                      this->updateDebugDraw();
+                  }
+
+                  // ---- FPS
+                  if (f->fpsLabel) {
+                      bool show = getB("show-fps");
+                      f->fpsLabel->setVisible(show);
+                      if (show) {
+                          float d = CCDirector::sharedDirector()->getDeltaTime();
+                          if (d > 0.f) f->fps = f->fps * 0.9f + (1.f / d) * 0.1f;
+                          f->fpsLabel->setString(fmt::format("FPS: {:.0f}", f->fps).c_str());
+                      }
+                  }
+
+                  // ---- Noclip accuracy
+                  bool noclip = getB("noclip");
+                  if (noclip && !m_player1->m_isDead && !f->killed) {
+                      f->total++;
+                      if (f->diedThisFrame) f->bad++;
+                      f->diedThisFrame = false;
+
+                      float acc = f->total > 0 ? 100.f * (f->total - f->bad) / f->total : 100.f;
+                      double minAcc = getD("noclip-min-accuracy");
+                      if (minAcc > 0 && f->total > 60 && acc < minAcc) {
+                          f->killed = true;
+                          PlayLayer::destroyPlayer(m_player1, m_anticheatSpike);
+                      }
+                      if (f->label) {
+                          if (getB("show-accuracy")) {
+                              f->label->setVisible(true);
+                              f->label->setString(fmt::format("Accuracy: {:.2f}%  Deaths: {}", acc, f->bad).c_str());
+                          } else {
+                              f->label->setVisible(false);
+                          }
+                      }
+                  } else if (f->label) {
+                      f->label->setVisible(noclip && getB("show-accuracy"));
+                  }
+
+                  // ---- Voice jump
+                  if (getB("voice-jump")) {
+                      if (!mic::started) mic::start();
+                      float lvl = mic::level();
+                      bool loud = lvl > static_cast<float>(getD("voice-threshold"));
+                      bool dual = m_gameState.m_isDualMode;
+
+                      if (loud) {
+                          f->quiet = 0.f;
+                          if (!f->micDown) {
+                              f->micDown = true;
+                              this->handleButton(true, 1, true);
+                              if (dual) this->handleButton(true, 1, false);
+                          }
+                      } else if (f->micDown) {
+                          f->quiet += dt;
+                          if (f->quiet > 0.06f) {
+                              f->micDown = false;
+                              this->handleButton(false, 1, true);
+                              if (dual) this->handleButton(false, 1, false);
+                          }
+                      }
+                  } else if (mic::started) {
+                      mic::stop();
+                  }
+              }
+
+              void levelComplete() {
+                  if (isCheating()) m_isTestMode = true; // не сохранять прохождение
+                  PlayLayer::levelComplete();
+              }
+
+              void onQuit() {
+                  mic::stop();
+                  PlayLayer::onQuit();
+              }
+          };
+
+          // ---------------------------------------------------------------- не сохранять процент при читах
+          class $modify(MegaLevel, GJGameLevel) {
+              void savePercentage(int percent, bool isPracticeMode, int clicks, int attempts, bool isChkValid) {
+                  if (isCheating()) return;
+                  GJGameLevel::savePercentage(percent, isPracticeMode, clicks, attempts, isChkValid);
+              }
+          };
+
+          // ---------------------------------------------------------------- Speedhack
+          class $modify(MegaScheduler, CCScheduler) {
+              void update(float dt) {
+                  double s = getD("speed");
+                  CCScheduler::update(s == 1.0 ? dt : dt * static_cast<float>(s));
+              }
+          };
+
+          // ---------------------------------------------------------------- Unlock All
+          class $modify(MegaGameManager, GameManager) {
+              bool isIconUnlocked(int id, IconType type) {
+                  if (getB("unlock-all")) return true;
+                  return GameManager::isIconUnlocked(id, type);
+              }
+              bool isColorUnlocked(int key, UnlockType type) {
+                  if (getB("unlock-all")) return true;
+                  return GameManager::isColorUnlocked(key, type);
+              }
+          };
+
+          class $modify(MegaStats, GameStatsManager) {
+              bool isItemUnlocked(UnlockType type, int key) {
+                  if (getB("unlock-all")) return true;
+                  return GameStatsManager::isItemUnlocked(type, key);
+              }
+          };
+
+          // ---------------------------------------------------------------- Кнопка в главном меню + валюта
+          class $modify(MegaMenuLayer, MenuLayer) {
+              bool init() {
+                  if (!MenuLayer::init()) return false;
+                  applyFps();
+
+                  static bool once = false;
+                  if (!once) {
+                      once = true;
+                      if (getB("apply-on-launch")) applyCurrencies();
+                  }
+
+                  if (auto menu = this->getChildByID("bottom-menu")) {
+                      auto spr = ButtonSprite::create("Mega");
+                      spr->setScale(0.7f);
+                      auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(MegaMenuLayer::onMega));
+                      btn->setID("mega-mod-button"_spr);
+                      menu->addChild(btn);
+                      menu->updateLayout();
+                  }
+                  return true;
+              }
+
+              void onMega(CCObject*) {
+                  createQuickPopup(
+                      "Mega Mod",
+                      "Apply stars, moons, orbs, diamonds and coins from the mod settings now?\n"
+                      "(Values set to 0 are not changed.)",
+                      "Cancel", "Apply",
+                      [](FLAlertLayer*, bool applyBtn) {
+                          if (applyBtn) {
+                              applyCurrencies();
+                              Notification::create("Currencies applied!", NotificationIcon::Success)->show();
+                          }
+                      }
+                  );
+              }
+          };
+
+          // ---------------------------------------------------------------- Jump Hack + No Death Effect
+          class $modify(MegaPlayer, PlayerObject) {
+              bool pushButton(PlayerButton button) {
+                  if (getB("jump-hack")) m_isOnGround = true;
+                  return PlayerObject::pushButton(button);
+              }
+
+              void playDeathEffect() {
+                  if (getB("no-death-effect")) return;
+                  PlayerObject::playDeathEffect();
+              }
+          };
+          GDEOF
+
+      - name: Set latest stable Geode version in mod.json
+        shell: bash
+        run: |
+          V=$(git ls-remote --tags --refs https://github.com/geode-sdk/geode | sed 's|.*refs/tags/||' | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -n1)
+          echo "Using Geode $V"
+          jq --arg v "$V" '.geode = $v' mod.json > mod.tmp
+          mv mod.tmp mod.json
+
+      - name: Build the mod
+        uses: geode-sdk/build-geode-mod@main
+        with:
+          bindings: geode-sdk/bindings
+          bindings-ref: main
+          combine: true
+          target: ${{ matrix.config.target }}
+
+  package:
+    name: Package builds
+    runs-on: ubuntu-latest
+    needs: ["build"]
+    steps:
+      - uses: geode-sdk/build-geode-mod/combine@main
+        id: build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Build Output
+          path: ${{ steps.build.outputs.build-output }}
